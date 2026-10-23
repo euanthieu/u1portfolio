@@ -8,7 +8,7 @@ export const MEDIA_BASE = 'media/';
 
 export const PROFILE = {
     name: ['Euan', 'Mathieu'],
-    bio: 'Designer, video editor and web developer. Posters, short-form video and websites for churches, ministries and brands.',
+    bio: 'Designer, video editor, motion graphics editor and web developer. Posters, short-form video, motion graphics and websites for churches, ministries and brands.',
     // Shown in the profile panel.
     about: [
         'I make the things people see first: event posters, sermon graphics, short-form ads, ministry films and the websites that hold them.',
@@ -26,6 +26,7 @@ export const PROFILE = {
 };
 
 // type: 'image' | 'video' | 'site'
+// featured: true puts a work in the big column, and the page opens centred on it.
 // For videos: `file` is the full video (lightbox), `loop` the short muted
 // tile preview, `poster` the still frame.
 export const WORKS = [
@@ -36,7 +37,7 @@ export const WORKS = [
     { id: 'zoltalk', type: 'site', title: 'ZolTalk', category: 'Website', url: 'https://zoltalk.com/', file: 'zoltalk.jpg', w: 1440, h: 900 },
     { id: 'yth-gig-collage', type: 'image', title: 'YTH GIG — Collage', category: 'Poster', client: 'Glorious Youth', file: 'yth-gig-collage.jpg', w: 1349, h: 1688 },
     { id: 'protect-your-testimony', type: 'image', title: 'Protect Your Testimony', category: 'Sermon notes', client: 'Glorious Church', file: 'protect-your-testimony.jpg', w: 1080, h: 1350 },
-    { id: 'benefit-dinner', type: 'video', title: 'Benefit Dinner', category: 'Film', client: 'Helping Hands', file: 'benefit-dinner.mp4', loop: 'benefit-dinner-loop.mp4', poster: 'benefit-dinner.jpg', w: 1080, h: 1350 },
+    { id: 'benefit-dinner', type: 'video', featured: true, title: 'Benefit Dinner', category: 'Film', client: 'Helping Hands', file: 'benefit-dinner.mp4', loop: 'benefit-dinner-loop.mp4', poster: 'benefit-dinner.jpg', w: 1080, h: 1350 },
     { id: 'yth-night', type: 'image', title: 'YTH Night', category: 'Poster', client: 'Glorious Youth', file: 'yth-night.jpg', w: 1080, h: 1080 },
     { id: 'living-on-the-word', type: 'image', title: 'Living on the Word of God', category: 'Sermon notes', client: 'Glorious Church', file: 'living-on-the-word.jpg', w: 1080, h: 1350 },
     { id: 'legal-terminal', type: 'video', title: 'Legal Terminal — Walkthrough', category: 'Product film', file: 'legal-terminal.mp4', loop: 'legal-terminal-loop.mp4', poster: 'legal-terminal.jpg', w: 1920, h: 1080 },

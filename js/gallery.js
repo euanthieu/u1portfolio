@@ -210,7 +210,8 @@ class U1Gallery extends HTMLElement {
         this.pan = { x: 0, y: 0, vx: 0, vy: 0 };
         this.cols = [];
         this.drag = null;
-        this.lastInput = 0;
+        // Hold the idle drift until a few seconds after the intro.
+        this.lastInput = performance.now() + 3000;
         this.current = -1;
         this.onKey = this.onKey.bind(this);
         this.frame = this.frame.bind(this);
@@ -395,21 +396,112 @@ class U1Gallery extends HTMLElement {
         // Masonry: shortest column wins, but avoid stacking the same media type
         // or the same series ("Psyche — …") in one column.
         const series = (w) => (w.series || w.title.split(' — ')[0]).toLowerCase();
-        const buckets = Array.from({ length: C }, () => ({ tiles: [], h: 0, types: [], series: [] }));
-        works.forEach((item, i) => {
-            const cost = (b) => b.h + (b.types[b.types.length - 1] === item.type ? colW * 1.5 : 0) + (b.series.includes(series(item)) ? colW * 3 : 0);
-            const b = buckets.reduce((a, x) => (cost(x) < cost(a) ? x : a));
-            const th = Math.round((colW * (item.h || 1)) / (item.w || 1));
+        const bucket = (w) => ({ tiles: [], h: 0, types: [], series: [], w });
+        // Landscape works and anything marked `featured` go in the big column.
+        const isWide = (w) => w.featured || (w.w || 1) / (w.h || 1) >= 1.3;
+        const wideItems = works.map((w, i) => i).filter((i) => isWide(works[i]));
+        const hasWide = wideItems.length >= 3;
+        // Use only as many normal columns as keep each one ~1.25 screens tall,
+        // so a tile never shows twice in the same column at once.
+        const normalH = works.reduce((s, w) => (hasWide && isWide(w) ? s : s + (colW * (w.h || 1)) / (w.w || 1) + gap), 0);
+        const maxCols = hasWide ? C - 1 : C;
+        let nCols = Math.max(2, Math.min(maxCols, Math.floor(normalH / (H * 1.25))));
+        // A series of n works needs 2n columns in total to keep every one of them
+        // a column apart (wrap-around included). Add columns for that while each
+        // still stays at least a screen tall.
+        const seriesMax = Math.max(0, ...Object.values(works.reduce((m, w) => {
+            if (!(hasWide && isWide(w))) m[series(w)] = (m[series(w)] || 0) + 1;
+            return m;
+        }, {})).filter((n) => n > 1));
+        const needed = seriesMax * 2 - (hasWide ? 1 : 0);
+        if (nCols < needed && needed <= maxCols && normalH / needed >= H * 1.05) nCols = needed;
+        const buckets = Array.from({ length: nCols }, () => bucket(colW));
+        const place = (b, item, i) => {
+            const th = Math.round((b.w * (item.h || 1)) / (item.w || 1));
             b.tiles.push({ i, th });
             b.types.push(item.type);
             b.series.push(series(item));
             b.h += th + gap;
+        };
+        // Landscape works get their own double-width column so they read big.
+        const wide = hasWide ? bucket(colW * 2 + gap) : null;
+        if (wide) {
+            // Featured first, then alternate stills and videos so films are never adjacent.
+            const feat = wideItems.filter((i) => works[i].featured);
+            const vids = wideItems.filter((i) => !works[i].featured && works[i].type === 'video');
+            const rest = wideItems.filter((i) => !works[i].featured && works[i].type !== 'video');
+            feat.forEach((i) => place(wide, works[i], i));
+            while (vids.length || rest.length) {
+                if (rest.length) place(wide, works[rest[0]], rest.shift());
+                if (vids.length) place(wide, works[vids[0]], vids.shift());
+            }
+        }
+        // Spread each series (e.g. the three Psyche ads) across columns as far
+        // apart as possible, counting the wide column and the wrap-around.
+        const wideAt = Math.max(1, Math.floor(nCols / 2));
+        const T = nCols + (wide ? 1 : 0);
+        const tIdx = (n) => (wide && n >= wideAt ? n + 1 : n);
+        const groups = {};
+        works.forEach((w, i) => {
+            if (!(wide && isWide(w))) (groups[series(w)] = groups[series(w)] || []).push(i);
         });
-
-        this.blockW = C * (colW + gap);
+        const pinned = new Set();
+        const spread = [];
+        Object.values(groups).filter((g) => g.length > 1 && g.length <= nCols).forEach((g) => {
+            let best = null;
+            let bestGap = -1;
+            const pick = (start, acc) => {
+                if (acc.length === g.length) {
+                    let gapMin = Infinity;
+                    acc.forEach((a) => acc.forEach((b) => {
+                        const d = Math.abs(tIdx(a) - tIdx(b));
+                        if (a !== b) gapMin = Math.min(gapMin, d, T - d);
+                    }));
+                    if (gapMin > bestGap) [best, bestGap] = [acc.slice(), gapMin];
+                    return;
+                }
+                for (let n = start; n < nCols; n++) pick(n + 1, acc.concat(n));
+            };
+            pick(0, []);
+            // Each pinned work is the first tile in its column (y = 0).
+            g.forEach((i, k) => {
+                place(buckets[best[k]], works[i], i);
+                pinned.add(i);
+            });
+            spread.push(best.map((n) => ({ b: buckets[n], t: tIdx(n) })).sort((a, b) => a.t - b.t));
+        });
+        works.forEach((item, i) => {
+            if ((wide && isWide(item)) || pinned.has(i)) return;
+            const cost = (b) => b.h + (b.types[b.types.length - 1] === item.type ? colW * 0.8 : 0) + (b.series.includes(series(item)) ? colW * 3 : 0);
+            place(buckets.reduce((a, x) => (cost(x) < cost(a) ? x : a)), item, i);
+        });
+        if (wide) buckets.splice(wideAt, 0, wide);
+        const lefts = [];
+        this.blockW = buckets.reduce((x, b) => {
+            lefts.push(x);
+            return x + b.w + gap;
+        }, 0);
         const reps = Math.ceil(W / this.blockW) + 1;
         const rand = rng(7);
         const phases = buckets.map((b) => Math.round(rand() * b.h));
+
+        // Open centred on the first featured work, until the visitor moves the grid.
+        if (wide && !this.touched && wide.tiles.length && works[wide.tiles[0].i].featured) {
+            const c = buckets.indexOf(wide);
+            this.pan.x = W / 2 - wide.w / 2 - lefts[c];
+            this.pan.y = H / 2 - wide.tiles[0].th / 2 - phases[c];
+            this.pan.vx = this.pan.vy = 0;
+        }
+
+        // Stagger a series vertically too: when columns can't keep them apart,
+        // neighbours start a third of a column apart so they never sit side by side.
+        spread.forEach((grp) => {
+            const step = Math.max(...grp.map((g) => g.b.h)) / grp.length;
+            grp.forEach((g, k) => {
+                const c = buckets.indexOf(g.b);
+                phases[c] = mod(k * step - this.pan.y, g.b.h);
+            });
+        });
         const autoplay = !reduced();
         this.io = new IntersectionObserver(this.onVisible.bind(this), { rootMargin: '120px' });
 
@@ -419,8 +511,8 @@ class U1Gallery extends HTMLElement {
                 if (!b.tiles.length) return;
                 const col = document.createElement('div');
                 col.className = 'col';
-                col.style.left = `${(r * C + c) * (colW + gap)}px`;
-                col.style.width = `${colW}px`;
+                col.style.left = `${r * this.blockW + lefts[c]}px`;
+                col.style.width = `${b.w}px`;
                 const copies = Math.ceil(H / b.h) + 1;
                 for (let k = 0; k < copies; k++) {
                     b.tiles.forEach(({ i, th }) => col.appendChild(this.tile(works[i], i, th, autoplay)));
@@ -521,6 +613,7 @@ class U1Gallery extends HTMLElement {
             this.drag = { id: e.pointerId, lx: e.clientX, ly: e.clientY, moved: 0, tile: e.target.closest('.tile') };
             this.pan.vx = this.pan.vy = 0;
             this.lastInput = performance.now();
+            this.touched = true;
             st.setPointerCapture(e.pointerId);
         });
         st.addEventListener('pointermove', (e) => {
@@ -537,6 +630,7 @@ class U1Gallery extends HTMLElement {
             this.pan.vx = this.pan.vx * 0.4 + dx * 0.6;
             this.pan.vy = this.pan.vy * 0.4 + dy * 0.6;
             this.lastInput = performance.now();
+            this.touched = true;
         });
         const end = (e) => {
             const d = this.drag;
@@ -557,6 +651,7 @@ class U1Gallery extends HTMLElement {
             this.pan.y -= e.deltaY * k;
             this.pan.vx = this.pan.vy = 0;
             this.lastInput = performance.now();
+            this.touched = true;
         }, { passive: false });
 
         // Hovering a tile dims the rest and names it on the wall label.
@@ -604,6 +699,7 @@ class U1Gallery extends HTMLElement {
             this.pan.vx += step[0] * 0.12;
             this.pan.vy += step[1] * 0.12;
             this.lastInput = performance.now();
+            this.touched = true;
         }
     }
 
