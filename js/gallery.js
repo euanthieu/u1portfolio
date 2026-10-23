@@ -143,6 +143,24 @@ a { color: inherit; text-decoration: none; }
 .pf .idx .c, .pf .ct .c { color: var(--charcoal); text-transform: uppercase; font-size: 12px; white-space: nowrap; }
 .pf .x { position: sticky; top: 0; align-self: flex-end; margin-bottom: -64px; z-index: 1; }
 
+/* ---------- website tiles: a page that scrolls itself ---------- */
+.bb { display: flex; align-items: center; gap: 5px; height: 22px; padding: 0 9px; background: var(--white); color: #8a8a8a; font-size: 10px; letter-spacing: -.02em; flex: none; }
+.bb i { width: 7px; height: 7px; border-radius: 50%; background: #d9d9d9; flex: none; }
+.bb span { flex: 1; text-align: center; margin-right: 31px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.tile.site { display: flex; flex-direction: column; background: var(--white); }
+.tile.site .vp { position: relative; flex: 1; overflow: hidden; }
+.tile.site .vp img { position: static; height: auto; display: block; animation: pagescroll var(--dur, 40s) ease-in-out infinite; }
+@keyframes pagescroll {
+    0%, 6% { transform: translateY(0); }
+    47%, 53% { transform: translateY(var(--dist, 0px)); }
+    94%, 100% { transform: translateY(0); }
+}
+.lb .media { position: relative; }
+.lb .sitebox { position: absolute; top: 56px; bottom: 12px; left: 0; right: 0; margin: 0 auto; width: min(1100px, calc(100% - 32px)); display: flex; flex-direction: column; background: var(--white); }
+.lb .sitebox .bb { height: 28px; font-size: 11px; }
+.lb .sitebox .vp { flex: 1; min-height: 0; overflow-y: auto; overscroll-behavior: contain; }
+.lb .sitebox .vp img { width: 100%; max-height: none; display: block; }
+
 /* ---------- showreel hero ---------- */
 .hero { position: absolute; inset: 0; z-index: 15; background: var(--black); }
 .hero[hidden] { display: none; }
@@ -162,6 +180,7 @@ a { color: inherit; text-decoration: none; }
     .grain { animation: none; }
     .intro, .pf, .lb, .tile, .tile video { transition: none; }
     .hero .cue i { animation: none; }
+    .tile.site .vp img { animation: none; }
 }
 `;
 
@@ -276,7 +295,7 @@ class U1Gallery extends HTMLElement {
     // ---------- media resolution ----------
 
     src(item, key) {
-        const override = { file: 'src', poster: 'posterSrc', loop: 'loopSrc' }[key];
+        const override = { file: 'src', poster: 'posterSrc', loop: 'loopSrc', page: 'pageSrc' }[key];
         if (item[override]) return item[override];
         if (!item[key]) return '';
         if (/^(https?:)?\/\//.test(item[key])) return item[key];
@@ -457,7 +476,8 @@ class U1Gallery extends HTMLElement {
         if (nCols < needed && needed <= maxCols && normalH / needed >= H * 1.05) nCols = needed;
         const buckets = Array.from({ length: nCols }, () => bucket(colW));
         const place = (b, item, i) => {
-            const th = Math.round((b.w * (item.h || 1)) / (item.w || 1));
+            // A website with a full-page capture gets a tall "browser" tile.
+            const th = Math.round(item.page ? b.w * 1.1 : (b.w * (item.h || 1)) / (item.w || 1));
             b.tiles.push({ i, th });
             b.types.push(item.type);
             b.series.push(series(item));
@@ -555,7 +575,7 @@ class U1Gallery extends HTMLElement {
                 col.style.width = `${b.w}px`;
                 const copies = Math.ceil(H / b.h) + 1;
                 for (let k = 0; k < copies; k++) {
-                    b.tiles.forEach(({ i, th }) => col.appendChild(this.tile(works[i], i, th, autoplay)));
+                    b.tiles.forEach(({ i, th }) => col.appendChild(this.tile(works[i], i, th, autoplay, b.w)));
                 }
                 frag.appendChild(col);
                 this.cols.push({ el: col, period: b.h, phase: phases[c], oy: null });
@@ -567,11 +587,12 @@ class U1Gallery extends HTMLElement {
         setTimeout(() => this.shell.stage.classList.add('ready'), 30);
     }
 
-    tile(item, i, th, autoplay) {
+    tile(item, i, th, autoplay, width) {
         const t = document.createElement('div');
         t.className = 'tile';
         t.dataset.i = i;
         t.style.height = `${th}px`;
+        if (item.type === 'site' && item.page) return this.siteTile(t, item, th, width);
         const img = document.createElement('img');
         img.alt = '';
         img.loading = 'lazy';
@@ -597,6 +618,35 @@ class U1Gallery extends HTMLElement {
         mk.textContent = item.type === 'video' ? 'Play ▶' : item.type === 'site' ? 'Visit ↗' : 'View';
         t.appendChild(mk);
         return t;
+    }
+
+    // Browser bar + the full-page capture panning down and back up.
+    siteTile(t, item, th, width) {
+        const BAR = 22;
+        t.classList.add('site');
+        t.innerHTML = `<div class="bb"><i></i><i></i><i></i><span>${esc(this.host(item.url))}</span></div><div class="vp"></div>`;
+        const img = document.createElement('img');
+        img.alt = '';
+        img.decoding = 'async';
+        img.draggable = false;
+        img.style.width = `${width}px`;
+        img.addEventListener('load', () => {
+            const dist = Math.max(0, (width * img.naturalHeight) / img.naturalWidth - (th - BAR));
+            img.style.setProperty('--dist', `${-dist}px`);
+            // ~60px a second each way, plus the pauses at top and bottom.
+            img.style.setProperty('--dur', `${Math.max(12, (dist * 2) / 60 / 0.82)}s`);
+        });
+        img.src = this.src(item, 'page');
+        t.querySelector('.vp').appendChild(img);
+        const mk = document.createElement('span');
+        mk.className = 'mk';
+        mk.textContent = 'Visit ↗';
+        t.appendChild(mk);
+        return t;
+    }
+
+    host(url) {
+        return String(url || '').replace(/^https?:\/\//, '').replace(/\/$/, '');
     }
 
     onVisible(entries) {
@@ -902,20 +952,49 @@ class U1Gallery extends HTMLElement {
             media.controls = true;
             media.playsInline = true;
             media.autoplay = true;
+        } else if (w.type === 'site' && w.page) {
+            media = document.createElement('div');
+            media.className = 'sitebox';
+            media.innerHTML = `<div class="bb"><i></i><i></i><i></i><span>${esc(this.host(w.url))}</span></div><div class="vp"><img alt="${esc(w.title)}"></div>`;
+            media.querySelector('img').src = this.src(w, 'page');
         } else {
             media = document.createElement('img');
             media.src = this.src(w, 'file');
             media.alt = w.title;
         }
         s.lbMedia.appendChild(media);
+        cancelAnimationFrame(this.siteRaf);
+        if (media.className === 'sitebox' && !reduced()) this.autoScroll(media.querySelector('.vp'));
         s.lbIx.textContent = `${String(i + 1).padStart(2, '0')} / ${String(works.length).padStart(2, '0')}`;
         s.lbCap.innerHTML = `<div class="m">${esc(w.category || '')}</div><div class="t">${esc(w.title)}</div><div class="m">${esc([w.client, w.year].filter(Boolean).join(' · '))}</div>`;
         s.lbCtl.innerHTML =
-            (w.type === 'site' && w.url ? `<a class="pill" href="${esc(w.url)}" target="_blank" rel="noopener"><span class="l">Visit site ↗</span><span class="v">${esc(w.url.replace(/^https?:\/\//, '').replace(/\/$/, ''))}</span></a>` : '') +
+            (w.type === 'site' && w.url ? `<a class="pill" href="${esc(w.url)}" target="_blank" rel="noopener"><span class="l">Visit site ↗</span><span class="v">${esc(this.host(w.url))}</span></a>` : '') +
             `<button class="pill" type="button" data-act="prev" aria-label="Previous work"><span class="l">←</span><span class="v">Prev</span></button>` +
             `<button class="pill" type="button" data-act="next" aria-label="Next work"><span class="l">→</span><span class="v">Next</span></button>`;
         s.lb.classList.add('open');
         s.lb.querySelector('.x').focus({ preventScroll: true });
+    }
+
+    // Glide down the page in the lightbox until the visitor takes over.
+    autoScroll(vp) {
+        let stopped = false;
+        const stop = () => {
+            stopped = true;
+        };
+        ['wheel', 'touchstart', 'pointerdown', 'keydown'].forEach((ev) => vp.addEventListener(ev, stop, { passive: true, once: true }));
+        let pos = 0;
+        let last = 0;
+        const step = (now) => {
+            if (stopped || !vp.isConnected) return;
+            // Hold the top for a moment, then ~90px a second.
+            if (last && now - this.siteStart > 1200) pos += (Math.min(now - last, 100) / 1000) * 90;
+            last = now;
+            vp.scrollTop = pos;
+            if (vp.scrollTop + vp.clientHeight >= vp.scrollHeight - 1 && pos > 10) return;
+            this.siteRaf = requestAnimationFrame(step);
+        };
+        this.siteStart = performance.now();
+        this.siteRaf = requestAnimationFrame(step);
     }
 
     lbAction(act) {
@@ -927,6 +1006,7 @@ class U1Gallery extends HTMLElement {
 
     closeLightbox() {
         const s = this.shell;
+        cancelAnimationFrame(this.siteRaf);
         const v = s.lbMedia.querySelector('video');
         if (v) v.pause();
         s.lb.classList.remove('open');
