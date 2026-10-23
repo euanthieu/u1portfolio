@@ -1,0 +1,34 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Euan Mathieu — Portfolio</title>
+    <meta name="description" content="Euan Mathieu — designer, video editor and web developer. Posters, short-form video and websites.">
+    <meta property="og:title" content="Euan Mathieu — Portfolio">
+    <meta property="og:description" content="Posters, short-form video and websites.">
+    <meta property="og:image" content="media/family-day-2026.jpg">
+    <meta name="theme-color" content="#111111">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <style>
+        html, body { margin: 0; background: #111; }
+    </style>
+</head>
+<body>
+    <u1-gallery id="gallery"></u1-gallery>
+    <noscript>
+        <p style="color:#fff;font-family:sans-serif;padding:24px">Euan Mathieu — designer, video editor and web developer. Contact: <a style="color:#fff" href="mailto:euanthieu@gmail.com">email</a>.</p>
+    </noscript>
+    <script type="module">
+        import './js/gallery.js';
+        import { PROFILE, WORKS, MEDIA_BASE } from './js/portfolio.js';
+
+        document.getElementById('gallery').setAttribute('data', JSON.stringify({
+            profile: PROFILE,
+            works: WORKS,
+            mediaBase: MEDIA_BASE
+        }));
+    </script>
+</body>
+</html>
