@@ -143,6 +143,17 @@ a { color: inherit; text-decoration: none; }
 .pf .idx .c, .pf .ct .c { color: var(--charcoal); text-transform: uppercase; font-size: 12px; white-space: nowrap; }
 .pf .x { position: sticky; top: 0; align-self: flex-end; margin-bottom: -64px; z-index: 1; }
 
+/* ---------- showreel hero ---------- */
+.hero { position: absolute; inset: 0; z-index: 15; background: var(--black); }
+.hero[hidden] { display: none; }
+.hero video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; background: var(--black); }
+@media (min-aspect-ratio: 13/10) { .hero video { object-fit: cover; } }
+.hero .hctl { position: absolute; left: 0; right: 0; bottom: 18px; display: flex; justify-content: center; gap: 6px; padding: 0 16px; }
+.hero .pill { height: 30px; gap: 6px; box-shadow: 0 0 0 1px rgba(0, 0, 0, .14); }
+.hero .pill svg { width: 16px; height: 16px; flex: none; }
+.hero .cue i { font-style: normal; display: inline-block; animation: nudge 1.6s ease-in-out infinite; }
+@keyframes nudge { 0%, 100% { transform: translateY(-1px); } 50% { transform: translateY(2px); } }
+
 @media (max-width: 600px) {
     .pf .in { padding: 22px 16px; gap: 29px; }
     .pills { bottom: 14px; }
@@ -150,6 +161,7 @@ a { color: inherit; text-decoration: none; }
 @media (prefers-reduced-motion: reduce) {
     .grain { animation: none; }
     .intro, .pf, .lb, .tile, .tile video { transition: none; }
+    .hero .cue i { animation: none; }
 }
 `;
 
@@ -162,7 +174,10 @@ const ICONS = {
     whatsapp: svg('<path d="M3.6 20.4 5 16.2A8.6 8.6 0 1 1 8 19.1z"/><path d="M9.2 8.2c-.3 2.9 3.3 6.7 6.5 6.6l.9-1.5-1.9-1-1 .8c-1-.4-2-1.4-2.4-2.4l.8-1-.9-1.9z"/>'),
     telegram: svg('<path d="M21 4 2.8 11.2l5.7 2L19 6.6 10.6 15l.3 5.2 3-3.6 4.8 3.6z"/>'),
     tiktok: svg('<path d="M14.5 3v11.6a3.6 3.6 0 1 1-3.6-3.6"/><path d="M14.5 3c.4 2.6 2.4 4.6 5 4.8"/>'),
-    link: svg('<path d="M7 17 17 7M8 7h9v9"/>')
+    link: svg('<path d="M7 17 17 7M8 7h9v9"/>'),
+    play: svg('<path d="M7 4.5v15l12-7.5z"/>'),
+    muted: svg('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="m16 9.5 5 5m0-5-5 5"/>'),
+    sound: svg('<path d="M4 9.5h3.5L12 5.5v13l-4.5-4H4z"/><path d="M15.5 9a4.5 4.5 0 0 1 0 6M18 6.5a8 8 0 0 1 0 11"/>')
 };
 const linkTarget = (href) => (/^(mailto|tel):/.test(href) ? '_self' : '_blank');
 const esc = (s) => String(s == null ? '' : s).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
@@ -294,6 +309,13 @@ class U1Gallery extends HTMLElement {
             <section class="pf" role="dialog" aria-modal="true" aria-label="Profile">
                 <div class="in"></div>
             </section>
+            <section class="hero" hidden aria-label="Showreel">
+                <video muted loop playsinline preload="auto"></video>
+                <div class="hctl">
+                    <button class="pill snd" type="button"></button>
+                    <button class="pill cue" type="button">Scroll <i>↓</i></button>
+                </div>
+            </section>
             <div class="intro" aria-hidden="true"><h1 class="name"></h1><small></small></div>
         `;
         const $ = (s) => this.root.querySelector(s);
@@ -301,10 +323,12 @@ class U1Gallery extends HTMLElement {
             stage: $('.stage'), plane: $('.plane'), grain: $('.grain'), label: $('.label'),
             bio: $('.bio'), now: $('.now'), pills: $('.pills'), intro: $('.intro'),
             lb: $('.lb'), lbMedia: $('.lb .media'), lbCap: $('.lb .cap'), lbCtl: $('.lb .ctl'), lbIx: $('.lb .ix'),
-            pf: $('.pf'), pfIn: $('.pf .in')
+            pf: $('.pf'), pfIn: $('.pf .in'),
+            hero: $('.hero'), heroVideo: $('.hero video'), snd: $('.hero .snd')
         };
         this.shell.grain.style.backgroundImage = `url(${noiseUrl()})`;
         this.bindStage();
+        this.bindHero();
         $('.plink').addEventListener('click', () => this.openProfile());
         this.shell.lb.addEventListener('click', (e) => {
             const act = e.target.closest('[data-act]');
@@ -327,8 +351,24 @@ class U1Gallery extends HTMLElement {
         const links = (profile.links || []).filter((l) => l.href);
         s.pills.innerHTML =
             links.map((l) => `<a class="pill ic" href="${esc(l.href)}" target="${linkTarget(l.href)}" rel="noopener" aria-label="${esc(l.label)}">${ICONS[l.icon] || ICONS.link}<span class="v">${esc(l.label)}</span></a>`).join('') +
+            (this.cfg.reel ? `<button class="pill ic" type="button" data-act="reel" aria-label="Showreel">${ICONS.play}<span class="v">Showreel</span></button>` : '') +
             `<button class="pill" type="button" data-act="index"><span class="l">Index</span><span class="v">All ${works.length} works</span></button>`;
         s.pills.querySelector('[data-act="index"]').addEventListener('click', () => this.openProfile(true));
+        const reelPill = s.pills.querySelector('[data-act="reel"]');
+        if (reelPill) reelPill.addEventListener('click', () => this.openHero());
+
+        const reel = this.cfg.reel;
+        if (reel && !this.heroReady) {
+            this.heroReady = true;
+            const v = s.heroVideo;
+            v.muted = true;
+            v.poster = this.src(reel, 'poster');
+            v.src = this.src(reel, 'file');
+            s.hero.hidden = false;
+            this.heroOpen = true;
+            this.setSound(false);
+            if (this.introDone) this.playHero();
+        }
 
         this.renderProfile(nameHtml);
         this.layout();
@@ -584,7 +624,7 @@ class U1Gallery extends HTMLElement {
             p.vy *= 0.93;
             if (Math.abs(p.vx) < 0.01) p.vx = 0;
             if (Math.abs(p.vy) < 0.01) p.vy = 0;
-            const overlay = this.current >= 0 || this.profileOpen;
+            const overlay = this.current >= 0 || this.profileOpen || this.heroOpen;
             if (!overlay && !reduced() && now - this.lastInput > 2500 && !document.hidden) p.y -= 0.22;
         }
         this.paint();
@@ -681,6 +721,13 @@ class U1Gallery extends HTMLElement {
 
     onKey(e) {
         if (e.defaultPrevented) return;
+        if (this.heroOpen) {
+            if (['ArrowDown', 'PageDown', ' ', 'Escape'].includes(e.key)) {
+                e.preventDefault();
+                this.closeHero();
+            }
+            return;
+        }
         if (e.key === 'Escape') {
             if (this.current >= 0) this.closeLightbox();
             else if (this.profileOpen) this.closeProfile();
@@ -709,9 +756,12 @@ class U1Gallery extends HTMLElement {
         const intro = this.shell.intro;
         if (reduced()) {
             intro.remove();
+            this.introDone = true;
             return;
         }
         const skip = () => {
+            this.introDone = true;
+            if (this.heroOpen) this.playHero();
             intro.classList.add('out');
             setTimeout(() => intro.remove(), 1200);
         };
@@ -722,6 +772,115 @@ class U1Gallery extends HTMLElement {
             clearTimeout(this.introTimer);
             skip();
         }, { once: true });
+    }
+
+    // ---------- showreel hero ----------
+
+    bindHero() {
+        const s = this.shell;
+        s.snd.addEventListener('click', () => this.setSound(s.heroVideo.muted));
+        s.hero.querySelector('.cue').addEventListener('click', () => this.closeHero());
+        let acc = 0;
+        s.hero.addEventListener('wheel', (e) => {
+            e.preventDefault();
+            acc = Math.max(0, acc + e.deltaY);
+            if (acc > 40) {
+                acc = 0;
+                this.closeHero();
+            }
+        }, { passive: false });
+        let ty = null;
+        s.hero.addEventListener('touchstart', (e) => {
+            ty = e.touches[0].clientY;
+        }, { passive: true });
+        s.hero.addEventListener('touchmove', (e) => {
+            if (ty !== null && ty - e.touches[0].clientY > 40) {
+                ty = null;
+                this.closeHero();
+            }
+        }, { passive: true });
+    }
+
+    playHero() {
+        const p = this.shell.heroVideo.play();
+        if (p && p.catch) p.catch(() => {});
+    }
+
+    setSound(on) {
+        const v = this.shell.heroVideo;
+        v.muted = !on;
+        this.shell.snd.innerHTML = on ? `${ICONS.sound}Sound off` : `${ICONS.muted}Sound on`;
+        this.shell.snd.setAttribute('aria-pressed', String(on));
+    }
+
+    // The rectangle the reel collapses into: the featured tile at the centre,
+    // or a centred box if there is none.
+    heroTarget() {
+        const host = this.getBoundingClientRect();
+        const cx = host.left + host.width / 2;
+        const cy = host.top + host.height / 2;
+        const featured = (this.cfg.works || []).findIndex((w) => w.featured);
+        let r = null;
+        if (featured >= 0) {
+            this.shell.plane.querySelectorAll(`.tile[data-i="${featured}"]`).forEach((t) => {
+                const b = t.getBoundingClientRect();
+                if (b.left <= cx && b.right >= cx && b.top <= cy && b.bottom >= cy) r = b;
+            });
+        }
+        if (!r) {
+            const w = host.width * 0.3;
+            const h = host.height * 0.3;
+            r = { left: cx - w / 2, right: cx + w / 2, top: cy - h / 2, bottom: cy + h / 2 };
+        }
+        const t = Math.max(0, r.top - host.top);
+        const l = Math.max(0, r.left - host.left);
+        const b = Math.max(0, host.bottom - r.bottom);
+        const rt = Math.max(0, host.right - r.right);
+        return `inset(${t}px ${rt}px ${b}px ${l}px)`;
+    }
+
+    // Collapse the reel into the centre tile, revealing the grid.
+    closeHero() {
+        if (!this.heroOpen) return;
+        this.heroOpen = false;
+        const hero = this.shell.hero;
+        const v = this.shell.heroVideo;
+        this.lastInput = performance.now();
+        if (reduced()) {
+            v.pause();
+            hero.hidden = true;
+            return;
+        }
+        hero.style.transition = 'clip-path .9s cubic-bezier(.7, 0, .2, 1), opacity .35s ease .75s';
+        hero.style.clipPath = this.heroTarget();
+        hero.style.opacity = '0';
+        clearTimeout(this.heroTimer);
+        this.heroTimer = setTimeout(() => {
+            if (this.heroOpen) return;
+            v.pause();
+            hero.hidden = true;
+        }, 1150);
+    }
+
+    // Grow the reel back out of the centre tile.
+    openHero() {
+        if (this.heroOpen || !this.cfg.reel) return;
+        this.heroOpen = true;
+        const hero = this.shell.hero;
+        clearTimeout(this.heroTimer);
+        hero.hidden = false;
+        this.playHero();
+        if (reduced()) {
+            hero.style.clipPath = '';
+            hero.style.opacity = '';
+            return;
+        }
+        hero.style.transition = 'none';
+        hero.style.clipPath = this.heroTarget();
+        hero.style.opacity = '1';
+        void hero.offsetHeight;
+        hero.style.transition = 'clip-path .9s cubic-bezier(.7, 0, .2, 1)';
+        hero.style.clipPath = 'inset(0px 0px 0px 0px)';
     }
 
     // ---------- lightbox ----------

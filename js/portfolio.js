@@ -6,6 +6,10 @@
 
 export const MEDIA_BASE = 'media/';
 
+// Full-screen showreel shown after the name intro; scrolling shrinks it into
+// the featured tile. Remove this export to go straight to the grid.
+export const REEL = { file: 'showreel.mp4', poster: 'showreel.jpg' };
+
 export const PROFILE = {
     name: ['Euan', 'Mathieu'],
     bio: 'Designer, video editor, motion graphics editor and web developer. Posters, short-form video, motion graphics and websites for churches, ministries and brands.',

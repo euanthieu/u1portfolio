@@ -22,11 +22,12 @@
     </noscript>
     <script type="module">
         import './js/gallery.js';
-        import { PROFILE, WORKS, MEDIA_BASE } from './js/portfolio.js';
+        import { PROFILE, WORKS, REEL, MEDIA_BASE } from './js/portfolio.js';
 
         document.getElementById('gallery').setAttribute('data', JSON.stringify({
             profile: PROFILE,
             works: WORKS,
+            reel: REEL,
             mediaBase: MEDIA_BASE
         }));
     </script>
