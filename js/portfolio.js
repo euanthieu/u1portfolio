@@ -29,7 +29,17 @@ export const PROFILE = {
     ]
 };
 
+// Media groups shown as the pill on every tile. Each work's `category` maps to
+// a group here; give a work `media: '…'` to override.
+export const GROUPS = {
+    'Graphic design': ['Poster', 'Sermon notes', 'Social', 'Typography', 'Social ad'],
+    Video: ['Film', 'TikTok ad', 'Product film'],
+    'Motion graphics': ['Animation', 'Motion graphics'],
+    Website: ['Website']
+};
+
 // type: 'image' | 'video' | 'site'
+// related / relatedLabel: id of another work and the button text that opens it.
 // featured: true puts a work in the big column, and the page opens centred on it.
 // For videos: `file` is the full video (lightbox), `loop` the short muted
 // tile preview, `poster` the still frame.
@@ -46,7 +56,8 @@ export const WORKS = [
     { id: 'yth-night', type: 'image', title: 'YTH Night', category: 'Poster', client: 'Glorious Youth', file: 'yth-night.jpg', w: 1080, h: 1080 },
     { id: 'living-on-the-word', type: 'image', title: 'Living on the Word of God', category: 'Sermon notes', client: 'Glorious Church', file: 'living-on-the-word.jpg', w: 1080, h: 1350 },
     { id: 'thinkglobal-dreams-reel', type: 'video', title: 'Think Global — Better Life', series: 'thinkglobal-reel', category: 'Motion graphics', client: 'Think Global Career Consultancy', file: 'thinkglobal-dreams-reel.mp4', loop: 'thinkglobal-dreams-reel-loop.mp4', poster: 'thinkglobal-dreams-reel.jpg', w: 360, h: 640 },
-    { id: 'legal-terminal', type: 'video', title: 'Legal Terminal — Walkthrough', category: 'Product film', file: 'legal-terminal.mp4', loop: 'legal-terminal-loop.mp4', poster: 'legal-terminal.jpg', w: 1920, h: 1080 },
+    { id: 'ilovelawyer', type: 'site', page: 'ilovelawyer-page.jpg', title: 'ilovelawyer', category: 'Website', role: 'Design & development', url: 'https://app.ilovelawyer.com/', related: 'legal-terminal', relatedLabel: 'Watch the walkthrough', file: 'ilovelawyer.jpg', w: 1440, h: 900 },
+    { id: 'legal-terminal', type: 'video', title: 'ilovelawyer — Legal Terminal walkthrough', category: 'Product film', url: 'https://app.ilovelawyer.com/', related: 'ilovelawyer', relatedLabel: 'See the website', file: 'legal-terminal.mp4', loop: 'legal-terminal-loop.mp4', poster: 'legal-terminal.jpg', w: 1920, h: 1080 },
     { id: 'lead-up', type: 'image', title: 'Lead Up', category: 'Poster', client: 'Glorious Youth', file: 'lead-up.jpg', w: 749, h: 1074 },
     { id: 'psyche-makapaniwala', type: 'video', title: 'Psyche — Makapaniwala', category: 'TikTok ad', file: 'psyche-makapaniwala.mp4', loop: 'psyche-makapaniwala-loop.mp4', poster: 'psyche-makapaniwala.jpg', w: 1080, h: 1920 },
     { id: 'thinkglobal-j1-america', type: 'image', title: 'Think Global — J1 in America', series: 'thinkglobal-poster', category: 'Social ad', client: 'Think Global Career Consultancy', year: 2023, file: 'thinkglobal-j1-america.jpg', w: 480, h: 466 },

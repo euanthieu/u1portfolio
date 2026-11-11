@@ -43,12 +43,14 @@ a { color: inherit; text-decoration: none; }
 .tile img, .tile video { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; display: block; pointer-events: none; }
 .tile video { opacity: 0; transition: opacity .5s ease; }
 .tile video.on { opacity: 1; }
-.tile .mk {
-    position: absolute; left: 8px; bottom: 8px; padding: 3px 9px 2px; border-radius: 9999px;
-    background: var(--white); color: var(--black); font-size: 10px; letter-spacing: -.02em; text-transform: uppercase;
-    opacity: 0; transform: translateY(4px); transition: opacity .25s, transform .25s;
+/* What kind of work a tile is: always shown, bottom-left. */
+.tile .tp {
+    position: absolute; left: 8px; bottom: 8px; z-index: 1; display: inline-flex; align-items: center; gap: 4px;
+    padding: 3px 9px 2px; border-radius: 9999px; background: var(--white); color: var(--black);
+    font-size: 10px; line-height: 1.2; letter-spacing: -.02em; text-transform: uppercase; white-space: nowrap;
+    box-shadow: 0 0 0 1px rgba(0, 0, 0, .12); pointer-events: none;
 }
-.stage:not(.grabbing) .tile:hover .mk { opacity: 1; transform: none; }
+@media (max-width: 600px) { .tile .tp { left: 6px; bottom: 6px; padding: 2px 7px 1px; font-size: 9px; } }
 .tile::after { content: ''; position: absolute; inset: 0; background: var(--black); opacity: 0; transition: opacity .35s; pointer-events: none; }
 .stage.dim .tile::after { opacity: .45; }
 .stage.dim .tile.hot::after { opacity: 0; }
@@ -617,10 +619,7 @@ class U1Gallery extends HTMLElement {
             t.appendChild(v);
             this.io.observe(v);
         }
-        const mk = document.createElement('span');
-        mk.className = 'mk';
-        mk.textContent = item.type === 'video' ? 'Play ▶' : item.type === 'site' ? 'Visit ↗' : 'View';
-        t.appendChild(mk);
+        t.appendChild(this.typePill(item));
         return t;
     }
 
@@ -642,11 +641,24 @@ class U1Gallery extends HTMLElement {
         });
         img.src = this.src(item, 'page');
         t.querySelector('.vp').appendChild(img);
-        const mk = document.createElement('span');
-        mk.className = 'mk';
-        mk.textContent = 'Visit ↗';
-        t.appendChild(mk);
+        t.appendChild(this.typePill(item));
         return t;
+    }
+
+    // Media group for a work: its `media` field, else looked up from its
+    // category in the GROUPS map, else the category itself.
+    group(item) {
+        if (item.media) return item.media;
+        const groups = this.cfg.groups || {};
+        const hit = Object.keys(groups).find((g) => groups[g].includes(item.category));
+        return hit || item.category || '';
+    }
+
+    typePill(item) {
+        const tp = document.createElement('span');
+        tp.className = 'tp';
+        tp.textContent = this.group(item) + (item.type === 'video' ? ' ▶' : item.type === 'site' ? ' ↗' : '');
+        return tp;
     }
 
     host(url) {
@@ -970,9 +982,10 @@ class U1Gallery extends HTMLElement {
         cancelAnimationFrame(this.siteRaf);
         if (media.className === 'sitebox' && !reduced()) this.autoScroll(media.querySelector('.vp'));
         s.lbIx.textContent = `${String(i + 1).padStart(2, '0')} / ${String(works.length).padStart(2, '0')}`;
-        s.lbCap.innerHTML = `<div class="m">${esc(w.category || '')}</div><div class="t">${esc(w.title)}</div><div class="m">${esc([w.client, w.year].filter(Boolean).join(' · '))}</div>`;
+        s.lbCap.innerHTML = `<div class="m">${esc(w.category || '')}</div><div class="t">${esc(w.title)}</div><div class="m">${esc([w.client, w.role, w.year].filter(Boolean).join(' · '))}</div>`;
         s.lbCtl.innerHTML =
-            (w.type === 'site' && w.url ? `<a class="pill" href="${esc(w.url)}" target="_blank" rel="noopener"><span class="l">Visit site ↗</span><span class="v">${esc(this.host(w.url))}</span></a>` : '') +
+            (w.url ? `<a class="pill" href="${esc(w.url)}" target="_blank" rel="noopener"><span class="l">Visit site ↗</span><span class="v">${esc(this.host(w.url))}</span></a>` : '') +
+            (w.related && works.some((x) => x.id === w.related) ? `<button class="pill" type="button" data-act="related"><span class="l">${esc(w.relatedLabel || 'Related work')}</span><span class="v">${esc(works.find((x) => x.id === w.related).title)}</span></button>` : '') +
             `<button class="pill" type="button" data-act="prev" aria-label="Previous work"><span class="l">←</span><span class="v">Prev</span></button>` +
             `<button class="pill" type="button" data-act="next" aria-label="Next work"><span class="l">→</span><span class="v">Next</span></button>`;
         s.lb.classList.add('open');
@@ -1006,6 +1019,11 @@ class U1Gallery extends HTMLElement {
         if (act === 'close') this.closeLightbox();
         if (act === 'next') this.openLightbox((this.current + 1) % n);
         if (act === 'prev') this.openLightbox((this.current - 1 + n) % n);
+        if (act === 'related') {
+            const works = this.cfg.works || [];
+            const j = works.findIndex((x) => x.id === works[this.current].related);
+            if (j >= 0) this.openLightbox(j);
+        }
     }
 
     closeLightbox() {
