@@ -468,11 +468,11 @@ class U1Gallery extends HTMLElement {
         // A series of n works needs 2n columns in total to keep every one of them
         // a column apart (wrap-around included). Add columns for that while each
         // still stays at least a screen tall.
-        const seriesMax = Math.max(0, ...Object.values(works.reduce((m, w) => {
+        // Only series small enough to be spread this way count.
+        const needed = Math.max(0, ...Object.values(works.reduce((m, w) => {
             if (!(hasWide && isWide(w))) m[series(w)] = (m[series(w)] || 0) + 1;
             return m;
-        }, {})).filter((n) => n > 1));
-        const needed = seriesMax * 2 - (hasWide ? 1 : 0);
+        }, {})).filter((n) => n > 1).map((n) => n * 2 - (hasWide ? 1 : 0)).filter((n) => n <= maxCols));
         if (nCols < needed && needed <= maxCols && normalH / needed >= H * 1.05) nCols = needed;
         const buckets = Array.from({ length: nCols }, () => bucket(colW));
         const place = (b, item, i) => {
@@ -528,7 +528,8 @@ class U1Gallery extends HTMLElement {
                 place(buckets[best[k]], works[i], i);
                 pinned.add(i);
             });
-            spread.push(best.map((n) => ({ b: buckets[n], t: tIdx(n) })).sort((a, b) => a.t - b.t));
+            // Columns alone kept them apart; no need to stagger this series.
+            if (bestGap < 2) spread.push(best.map((n) => ({ b: buckets[n], t: tIdx(n) })).sort((a, b) => a.t - b.t));
         });
         works.forEach((item, i) => {
             if ((wide && isWide(item)) || pinned.has(i)) return;
@@ -555,10 +556,13 @@ class U1Gallery extends HTMLElement {
 
         // Stagger a series vertically too: when columns can't keep them apart,
         // neighbours start a third of a column apart so they never sit side by side.
+        const staggered = new Set();
         spread.forEach((grp) => {
             const step = Math.max(...grp.map((g) => g.b.h)) / grp.length;
             grp.forEach((g, k) => {
                 const c = buckets.indexOf(g.b);
+                if (staggered.has(c)) return;
+                staggered.add(c);
                 phases[c] = mod(k * step - this.pan.y, g.b.h);
             });
         });
